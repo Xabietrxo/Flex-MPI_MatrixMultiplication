@@ -3,127 +3,119 @@
 #include <time.h>
 #include <mpi.h>
 
-#define FILAS_A 5
-#define COLUMNAS_A 3
-#define FILAS_B 3
-#define COLUMNAS_B 4
-#define FILAS_C FILAS_A
-#define COLUMNAS_C COLUMNAS_B
+#define ROWS1 17
+#define COLS1 16
+#define ROWS2 16
+#define COLS2 15
 
-void generarMatrizAleatoria(int filas, int columnas, int matriz[filas][columnas]) {
-    int i, j;
-    
-    for (i = 0; i < filas; i++) {
-        for (j = 0; j < columnas; j++) {
-            matriz[columnas*i+j] = rand() % 100;  // Generar números aleatorios entre 0 y 99
+void generateRandomMatrix(int *matrix, int rows, int cols) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            matrix[cols * i + j] = rand() % 100;
         }
     }
 }
-/*
-void multiplicarMatrices(int filas_A, int columnas_A, int columnas_B, int matriz_A[filas_A][columnas_A], int matriz_B[columnas_A][columnas_B], int matriz_C[filas_A][columnas_B]) {
-    int i, j, k;
 
-    for (i = 0; i < filas_A; i++) {
-        for (j = 0; j < columnas_B; j++) {
-            matriz_C[i][j] = 0;
-            for (k = 0; k < columnas_A; k++) {
-                matriz_C[i][j] += matriz_A[i][k] * matriz_B[k][j];
+void printMatrix(int *matrix, int rows, int cols) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            printf("%3d ", matrix[cols * i + j]);
+        }
+        printf("\n");
+    }
+}
+
+void mulMatrix(int *matrix1, int *matrix2, int *resultMatrix,
+               int rows1, int cols1, int cols2) {
+    for (int i = 0; i < rows1; i++) {
+        for (int j = 0; j < cols2; j++) {
+            resultMatrix[i * cols2 + j] = 0;
+            for (int k = 0; k < cols1; k++) {
+                resultMatrix[i * cols2 + j] += matrix1[i * cols1 + k] * matrix2[k * cols2 + j];
             }
         }
     }
 }
 
-void multiplicarMatrices2(int filas_A, int columnas_A, int columnas_B, int matriz_A[filas_A][columnas_A], int matriz_B[columnas_A][columnas_B], int matriz_C[filas_A][columnas_B]) {
-    int i, j, k, a, b;
-
-    for (int i = inicio; i < fin; i++)
-    {
-        matriz_C[i] = 0;
-        a = i/filas_A;
-        b = i%columnas_B;
-        for (int j = 0; j < columnas_A; j++)
-        {
-            matriz_C[i] += matriz_A[columnas_A*a+j]*matriz_B[columnas_B*j+b];
-        }
-    }
-}
-*/
-void imprimirMatriz(int filas, int columnas, int matriz[filas][columnas]) {
-    int i, j;
-
-    for (i = 0; i < filas; i++) {
-        for (j = 0; j < columnas; j++) {
-            printf("%3d ", matriz[columnas*i+j]);
+void compareMatrix(int *matrix1, int *matrix2, int rows, int cols) {
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            printf("%s |", (matrix1[cols * i + j] == matrix2[cols * i + j]) ? "true" : "false");
         }
         printf("\n");
     }
 }
 
 int main(int argc, char *argv[]) {
-    int matriz_A[FILAS_A][COLUMNAS_A];
-    int matriz_B[FILAS_B][COLUMNAS_B];
-    int matriz_C[FILAS_C][COLUMNAS_C];
+
+    int it=0;
+    int itmax=ROWS1*COLS2;
+
+    int *matrix1 = malloc(ROWS1 * COLS1 * sizeof(int));
+    int *matrix2 = malloc(ROWS2 * COLS2 * sizeof(int));
+    int *result  = malloc(ROWS1 * COLS2 * sizeof(int));
 
     int rank, size;
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-/*
-    if (size != 1 && size != FILAS_C) {
-        if (rank == 0) {
-            printf("El número de procesos debe ser 1 o igual al número de filas de la matriz resultante.\n");
-        }
-        MPI_Finalize();
-        return 0;
-    }
-*/
+
     if (rank == 0) {
-        srand(time(NULL));  // Inicializar la semilla aleatoria
-        generarMatrizAleatoria(FILAS_A, COLUMNAS_A, matriz_A);
-        generarMatrizAleatoria(FILAS_B, COLUMNAS_B, matriz_B);
+        srand(time(NULL));  // Initiate random seed
+        generateRandomMatrix(matrix1, ROWS1, COLS1);
+        generateRandomMatrix(matrix2, ROWS2, COLS2);
     }
 
-    MPI_Bcast(matriz_A, FILAS_A * COLUMNAS_A, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(matriz_B, FILAS_B * COLUMNAS_B, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(matrix1, ROWS1 * COLS1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(matrix2, ROWS2 * COLS2, MPI_INT, 0, MPI_COMM_WORLD);
 
-    int inicio = ((FILAS_C*COLUMNAS_C) / size) * rank;
-    int fin = inicio+(FILAS_C*COLUMNAS_C)/size;
-    int a, b;
+    int local_count = 0;
 
-    for (int i = inicio; i < fin; i++)
+    for (; it < itmax; it++)
     {
-        matriz_C[i] = 0;
-        a = i/FILAS_A;
-        b = i%COLUMNAS_B;
-        for (int j = 0; j < COLUMNAS_A; j++)
+        if (it%size == rank)
         {
-            matriz_C[i] += matriz_A[COLUMNAS_A*a+j]*matriz_B[COLUMNAS_B*j+b];
+            result[it] = 0;
+            for (int k = 0; k < COLS1; k++) {
+                result[it] += matrix1[(it/COLS2) * COLS1 + k] * matrix2[k * COLS2 + (it%COLS2)];
+            }
+            local_count++;
         }
     }
 
-/*
-    int submatriz_C[fin - inicio][COLUMNAS_C];
+    MPI_Datatype intercalate_type;
+    MPI_Type_vector(local_count, 1, size, MPI_INT, &intercalate_type);
+    MPI_Type_commit(&intercalate_type);
 
-    multiplicarMatrices(fin - inicio, COLUMNAS_A, COLUMNAS_B, matriz_A + inicio, matriz_B, submatriz_C);
-*/
-    int *buffer = NULL;
-    if (rank == 0) {
-        buffer = (int *)malloc(FILAS_C * COLUMNAS_C * sizeof(int));
+    if (rank!=0)
+    {
+        MPI_Send(&result[rank], 1, intercalate_type, 0, 0, MPI_COMM_WORLD);
+    } else{
+        for (int i = 1; i < size; i++)
+        {
+            MPI_Recv(&result[i], 1, intercalate_type, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
     }
 
-    MPI_Gather(resultado + inicio, fin - inicio, MPI_INT, buffer, fin - inicio, MPI_INT, 0, MPI_COMM_WORLD);
-
     if (rank == 0) {
-        printf("Matriz A:\n");
-        imprimirMatriz(FILAS_A, COLUMNAS_A, matriz_A);
 
-        printf("\nMatriz B:\n");
-        imprimirMatriz(FILAS_B, COLUMNAS_B, matriz_B);
+        int *resultMatrix = malloc(ROWS1 * COLS2 * sizeof(int));
+        mulMatrix(matrix1, matrix2, resultMatrix, ROWS1, COLS1, COLS2);
 
-        printf("\nResultado de la multiplicación:\n");
-        imprimirMatriz(FILAS_C, COLUMNAS_C, buffer);
+        printf("Matrix 1:\n");
+        printMatrix(matrix1, ROWS1, COLS1);
 
-        free(buffer);
+        printf("\nMatrix 2:\n");
+        printMatrix(matrix2, ROWS2, COLS2);
+
+        printf("\nMultiplication result:\n");
+        printMatrix(result, ROWS1, COLS2);
+
+        printf("\nCompare:\n");
+        compareMatrix(result, resultMatrix, ROWS1, COLS2);
+
+        free(result);
+        free(resultMatrix);
     }
 
     MPI_Finalize();
